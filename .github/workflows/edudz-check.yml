@@ -16,4 +16,5 @@ jobs:
           go-version-file: go.mod
       - run: go test ./cmd/server/assistant ./edupage/model
       - run: go test ./edupage -run TestAllowedAttachmentURL
+      - run: go run github.com/swaggo/swag/cmd/swag@v1.16.1 init -g server.go -d cmd/server,edupage,icanteen --parseDependency --parseInternal
       - run: go build ./cmd/server
