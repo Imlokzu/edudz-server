@@ -60,7 +60,7 @@ func TestInterruptedStreamCannotBecomeCompletedAnswer(t *testing.T) {
 	}))
 	defer server.Close()
 	service := New(Config{BaseURL: server.URL, APIKey: "x", Model: "test"}, nil)
-	_, _, err := service.completion(context.Background(), nil, func(string, interface{}) error { return nil })
+	_, err := service.completion(context.Background(), nil, func(string, interface{}) error { return nil })
 	if err == nil {
 		t.Fatal("truncated stream accepted")
 	}

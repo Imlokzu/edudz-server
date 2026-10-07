@@ -27,13 +27,18 @@ Put a private JSON file at `~/.config/edudz-ai/config.json`, permissions 0600:
 {
   "base_url": "https://integrate.api.nvidia.com/v1",
   "api_key": "",
-  "model": "meta/llama-3.2-90b-vision-instruct",
-  "vision_model": "meta/llama-3.2-11b-vision-instruct"
+  "model": "nvidia/nemotron-3-super-120b-a12b",
+  "vision_model": "meta/llama-3.2-11b-vision-instruct",
+  "request_options": {
+    "chat_template_kwargs": {"enable_thinking": false},
+    "temperature": 0.6,
+    "max_tokens": 4096
+  }
 }
 ```
 
 Set your own key in the private file. `EDUDZ_AI_CONFIG` can point to another path.
-No secrets belong in this repository or in the APK. Normal school login resolves
+No secrets belong in this repository or in the APK. Sampling/reasoning options can be configured separately for text and vision using `request_options` and `vision_request_options`; authenticated messages, tool definitions and stream mode remain protected. Normal school login resolves
 the school automatically for global EduPage accounts; a school is optional.
 
 For scanned PDF pages on the current Mac server:
@@ -66,3 +71,16 @@ was used before updating the service.
 
 Sources: EdupageAPI/edupage-api for the day-plan protocol, ledongthuc/pdf for PDF
 text extraction, and Android's MediaStore for the client-side Downloads flow.
+
+## Stronger assistant model — 2026-10-07
+
+The main model is NVIDIA Nemotron 3 Super 120B, selected after a live Ukrainian
+school-deadline and quadratic-equation check. It excluded finished work and the
+later biology deadline and found roots 2 and 3. The tested reply completed in
+2.4 seconds. Vision transcription remains a separate worker; the main model
+interprets its extracted material. The model configuration is read per request,
+so changing the model does not require an Android update.
+
+Reasoning deltas are preserved internally across tool calls for providers that
+require them, but are not streamed to the student. Client-provided reasoning is
+rejected. These behaviors have a mock-provider regression test.
