@@ -63,3 +63,23 @@ func TestClientCannotInjectPreservedReasoning(t *testing.T) {
 		t.Fatal("client-supplied hidden reasoning accepted")
 	}
 }
+
+func TestDeepSeekCompatibilityOmitsToolChoice(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]interface{}
+		json.NewDecoder(r.Body).Decode(&payload)
+		if _, present := payload["tool_choice"]; present {
+			t.Fatal("DeepSeek thinking requests must omit tool_choice")
+		}
+		if payload["tools"] == nil {
+			t.Fatal("tool definitions were lost")
+		}
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"Answer\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n")
+	}))
+	defer server.Close()
+	service := New(Config{BaseURL: server.URL, Model: "deepseek-flash", APIKey: "private", OmitToolChoice: true}, nil)
+	reply, err := service.completion(context.Background(), nil, func(string, interface{}) error { return nil })
+	if err != nil || reply.Content != "Answer" {
+		t.Fatalf("DeepSeek-compatible completion failed: %v", err)
+	}
+}

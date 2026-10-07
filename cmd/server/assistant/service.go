@@ -22,6 +22,7 @@ type Config struct {
 	Model                string                 `json:"model"`
 	VisionModel          string                 `json:"vision_model,omitempty"`
 	RequestOptions       map[string]interface{} `json:"request_options,omitempty"`
+	OmitToolChoice       bool                   `json:"omit_tool_choice,omitempty"`
 	VisionRequestOptions map[string]interface{} `json:"vision_request_options,omitempty"`
 }
 
@@ -247,6 +248,9 @@ func status(lang, key string) string {
 func (s *Service) completion(ctx context.Context, messages []Message, emit Emit) (Message, error) {
 	payload := map[string]interface{}{"model": s.Config.Model, "messages": messages, "stream": true, "max_tokens": 4096, "temperature": 0.4, "tools": tools, "tool_choice": "auto"}
 	applyRequestOptions(payload, s.Config.RequestOptions)
+	if s.Config.OmitToolChoice {
+		delete(payload, "tool_choice")
+	}
 	b, _ := json.Marshal(payload)
 	req, err := http.NewRequestWithContext(ctx, "POST", strings.TrimRight(s.Config.BaseURL, "/")+"/chat/completions", bytes.NewReader(b))
 	if err != nil {

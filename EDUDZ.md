@@ -84,3 +84,7 @@ so changing the model does not require an Android update.
 Reasoning deltas are preserved internally across tool calls for providers that
 require them, but are not streamed to the student. Client-provided reasoning is
 rejected. These behaviors have a mock-provider regression test.
+
+DeepSeek-compatible backends can set `omit_tool_choice: true` for thinking-mode
+requests while retaining tool definitions and prior assistant reasoning. The
+active server stays on Nemotron until a DeepSeek provider passes live checks.
