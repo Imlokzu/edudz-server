@@ -15,6 +15,7 @@ import (
 	"path"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -276,8 +277,18 @@ func attachment(ctx context.Context, client *edupage.EdupageClient, src, name st
 		data["text"] = string(text)
 		data["pages"] = r.NumPage()
 		page := 1
-		if v, ok := pageArg.(float64); ok && v >= 1 && v <= float64(r.NumPage()) {
+		if v, ok := pageArg.(float64); ok {
 			page = int(v)
+		}
+		if v, ok := pageArg.(string); ok {
+			parsed, parseErr := strconv.Atoi(v)
+			if parseErr != nil {
+				return ToolResult{}, errors.New("invalid PDF page")
+			}
+			page = parsed
+		}
+		if page < 1 || page > r.NumPage() {
+			return ToolResult{}, errors.New("invalid PDF page")
 		}
 		images, rasterErr := renderPDF(ctx, body, page)
 		if rasterErr == nil {
