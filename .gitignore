@@ -38,3 +38,8 @@ docs/
 logs/
 
 config.yaml
+
+# Private assistant configuration and local binaries
+*config.json
+*.apk
+pdf-preview

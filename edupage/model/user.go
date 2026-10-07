@@ -6,6 +6,7 @@ import (
 )
 
 type User struct {
+	UserID           string                 `json:"userid"`
 	Edubar           map[string]interface{} `json:"_edubar"`
 	Timeline         []TimelineItem         `json:"items"` // Only recent timeline, see EdupageClient.Timeline for more
 	DBI              DBI                    `json:"dbi"`
@@ -133,20 +134,20 @@ type Classroom struct {
 }
 
 type Students struct {
-	ID            string `json:"id"`
-	ClassroomID   string `json:"classroomid"`
-	Firstname     string `json:"firstname"`
-	Lastname      string `json:"lastname"`
-	Parent1ID     string `json:"parent1id"`
-	Parent2ID     string `json:"parent2id"`
-	Parent3ID     string `json:"parent3id"`
-	Gender        string `json:"gender"`
-	DateFrom      string `json:"datefrom"`
-	DateTo        string `json:"dateto"`
-	NumberInClass string `json:"numberinclass"`
-	IsOut         bool   `json:"isout"`
-	Number        string `json:"number"`
-	DataCopy      string `json:"kopiadata"`
+	ID            string          `json:"id"`
+	ClassroomID   string          `json:"classroomid"`
+	Firstname     string          `json:"firstname"`
+	Lastname      string          `json:"lastname"`
+	Parent1ID     string          `json:"parent1id"`
+	Parent2ID     string          `json:"parent2id"`
+	Parent3ID     string          `json:"parent3id"`
+	Gender        string          `json:"gender"`
+	DateFrom      string          `json:"datefrom"`
+	DateTo        string          `json:"dateto"`
+	NumberInClass string          `json:"numberinclass"`
+	IsOut         bool            `json:"isout"`
+	Number        string          `json:"number"`
+	DataCopy      json.RawMessage `json:"kopiadata"` // string or array depending on school
 }
 
 type Parents struct {

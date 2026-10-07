@@ -79,6 +79,14 @@ func Login(username, password, server, loginserver string) (Credentials, error) 
 					return Credentials{}, err
 				}
 
+				// Bad credentials come back as a relative redirect to the login page
+				if parsed.Query().Has("bad") {
+					return Credentials{}, ErrAuthorization
+				}
+				if parsed.Hostname() == "" {
+					return Credentials{}, fmt.Errorf("%w: unexpected redirect to %s", ErrAuthorization, loc)
+				}
+
 				sp := strings.Split(parsed.Hostname(), ".")
 				sub := sp[0]
 
