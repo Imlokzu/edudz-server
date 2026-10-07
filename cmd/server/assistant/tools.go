@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DislikesSchool/EduPage2-server/cmd/server/schoolday"
 	"github.com/DislikesSchool/EduPage2-server/edupage"
 	"github.com/DislikesSchool/EduPage2-server/edupage/model"
 	"github.com/ledongthuc/pdf"
@@ -161,11 +162,17 @@ func overview(client *edupage.EdupageClient, dateString string) (ToolResult, err
 		messages = messages[:35]
 	}
 	lessons := map[string]interface{}{}
+	breaks := map[string]interface{}{}
+	periods := []model.Period{}
+	for _, period := range user.DBI.Periods {
+		periods = append(periods, period)
+	}
 	tt, ttErr := client.GetTimetable(date, date.AddDate(0, 0, 6))
 	if ttErr == nil {
 		for day, items := range tt.Days {
 			rows := []map[string]interface{}{}
-			for _, item := range items {
+			slots := schoolday.Split(items, periods)
+			for _, item := range slots {
 				rooms := []string{}
 				teachers := []string{}
 				for _, id := range item.ClassroomIDs {
@@ -175,9 +182,10 @@ func overview(client *edupage.EdupageClient, dateString string) (ToolResult, err
 					teacher := user.DBI.Teachers[id]
 					teachers = append(teachers, teacher.Firstname+" "+teacher.Lastname)
 				}
-				rows = append(rows, map[string]interface{}{"subject": user.DBI.Subjects[item.SubjectID].Name, "subject_id": item.SubjectID, "period": item.Period, "start": item.StartTime, "end": item.EndTime, "rooms": rooms, "teachers": teachers})
+				rows = append(rows, map[string]interface{}{"subject": user.DBI.Subjects[item.SubjectID].Name, "subject_id": item.SubjectID, "period": item.Period, "start": item.StartTime, "end": item.EndTime, "rooms": rooms, "teachers": teachers, "block_start": item.BlockStart, "block_end": item.BlockEnd, "origin_period": item.OriginPeriod})
 			}
 			lessons[day] = rows
+			breaks[day] = schoolday.Gaps(slots, periods)
 		}
 	}
 	grades := []map[string]interface{}{}
@@ -190,7 +198,7 @@ func overview(client *edupage.EdupageClient, dateString string) (ToolResult, err
 			grades = grades[:60]
 		}
 	}
-	return ToolResult{Data: map[string]interface{}{"date": dateString, "homework": tasks, "messages": messages, "timetable": lessons, "grades": grades, "timetable_available": ttErr == nil, "grades_available": gradeErr == nil}}, nil
+	return ToolResult{Data: map[string]interface{}{"date": dateString, "homework": tasks, "messages": messages, "timetable": lessons, "breaks": breaks, "grades": grades, "timetable_available": ttErr == nil, "grades_available": gradeErr == nil}}, nil
 }
 func homework(client *edupage.EdupageClient, id string) (ToolResult, error) {
 	timeline, err := client.GetRecentTimeline()

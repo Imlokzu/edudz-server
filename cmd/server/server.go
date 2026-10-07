@@ -141,6 +141,7 @@ func main() {
 	api.GET("/timeline/recent", routes.RecentTimelineHandler)
 	api.GET("/timetable", routes.TimetableHandler)
 	api.GET("/timetable/recent", routes.RecentTimetableHandler)
+	api.GET("/school-day", routes.SchoolDayHandler)
 	api.GET("/subject/:id", routes.SubjectHandler)
 	api.GET("/teacher/:id", routes.TeacherHandler)
 	api.GET("/classroom/:id", routes.ClassroomHandler)

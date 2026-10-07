@@ -5,6 +5,11 @@ It preserves the upstream server and the existing school compatibility fixes.
 
 Authenticated extensions:
 
+- `GET /api/school-day`: separate bell periods, actual breaks/free periods,
+  current lesson/break, seconds remaining, school start/end, and the next actual
+  school day. Includes 60 days ahead for weekends and holidays. Timetables are
+  cached per account for one minute; clock state is evaluated on each request.
+  `date=YYYY-MM-DD` and read-only `at=RFC3339` support schedule previews.
 - `GET /api/lesson-plan?date=YYYY-MM-DD`: the student's published lesson topics.
 - `GET /api/etest?testid=…&superid=…`: homework material cards.
 - `GET /api/file?src=…`: downloads the student's EduPage attachments using the session.
@@ -55,7 +60,7 @@ extraction works without the helper; image-only PDFs then require a renderer.
 ## Build and validation
 
 ```sh
-go test ./cmd/server/assistant ./edupage/model
+go test -race ./cmd/server/assistant ./cmd/server/schoolday ./edupage/model
 go test ./edupage -run TestAllowedAttachmentURL
 go run github.com/swaggo/swag/cmd/swag@v1.16.1 init -g server.go -d cmd/server,edupage,icanteen --parseDependency --parseInternal
 go build -o ep2-server ./cmd/server
@@ -66,6 +71,9 @@ password flags. The new assistant tests use a mock model API and check fragmente
 streaming, tool calls, interrupted responses, history injection and image reads.
 
 The server loads `config.yaml` as before. `HOST` and `PORT` can run a staging copy.
+School time uses `EDUDZ_SCHOOL_TIMEZONE`, the account's published timezone, or
+`Europe/Berlin` for this deployment. The response includes school wall time and
+UTC offset so the app's clock can follow the server.
 The existing Mac service uses port 8130 and ep2.waveio.me. A staging copy on 8131
 was used before updating the service.
 
@@ -88,3 +96,15 @@ rejected. These behaviors have a mock-provider regression test.
 DeepSeek-compatible backends can set `omit_tool_choice: true` for thinking-mode
 requests while retaining tool definitions and prior assistant reasoning. The
 active server stays on Nemotron until a DeepSeek provider passes live checks.
+
+## School-day clock — 2.2
+
+Double lessons retain the teacher, room, group and original block identity while
+being split into individual bell periods. If bell metadata is unavailable, exact
+multiples of 45 minutes use a 45-minute fallback. Contiguous periods do not get
+invented breaks. Missing scheduled periods are marked as free time and never add
+to the lesson count. The assistant's timetable uses the same splitting function.
+
+Boundary tests cover 08:44:59 → 08:45, both school breaks and 13:00 completion.
+Authenticated staging checks confirmed six lessons on 2026-10-07, Friday → Monday,
+and the autumn holiday jump from 2026-10-30 to 2026-11-09.

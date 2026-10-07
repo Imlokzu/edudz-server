@@ -12,17 +12,20 @@ type CompleteTimetable struct {
 }
 
 type CompleteTimetableItem struct {
-	Type       string            `json:"type"`
-	Date       string            `json:"date"`
-	Period     string            `json:"uniperiod"`
-	StartTime  string            `json:"starttime"`
-	EndTime    string            `json:"endtime"`
-	Subject    model.Subject     `json:"subject"`
-	Classes    []model.Class     `json:"classes"`
-	GroupNames []string          `json:"groupnames"`
-	IGroupID   string            `json:"igroupid"`
-	Teachers   []model.Teacher   `json:"teachers"`
-	Classrooms []model.Classroom `json:"classrooms"`
-	StudentIDs []string          `json:"studentids"`
-	Colors     []string          `json:"colors"`
+	BlockStart   string            `json:"block_starttime,omitempty"`
+	BlockEnd     string            `json:"block_endtime,omitempty"`
+	OriginPeriod string            `json:"origin_period,omitempty"`
+	Type         string            `json:"type"`
+	Date         string            `json:"date"`
+	Period       string            `json:"uniperiod"`
+	StartTime    string            `json:"starttime"`
+	EndTime      string            `json:"endtime"`
+	Subject      model.Subject     `json:"subject"`
+	Classes      []model.Class     `json:"classes"`
+	GroupNames   []string          `json:"groupnames"`
+	IGroupID     string            `json:"igroupid"`
+	Teachers     []model.Teacher   `json:"teachers"`
+	Classrooms   []model.Classroom `json:"classrooms"`
+	StudentIDs   []string          `json:"studentids"`
+	Colors       []string          `json:"colors"`
 }
