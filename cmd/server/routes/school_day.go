@@ -1,8 +1,10 @@
 package routes
 
 import (
+	"context"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,6 +17,7 @@ import (
 
 type schoolDayCacheEntry struct {
 	Timetable model.Timetable
+	Plans     map[string][]map[string]interface{}
 	Cached    time.Time
 }
 
@@ -28,6 +31,14 @@ func completeSchoolSlots(slots []schoolday.Slot, user model.User) []apimodel.Com
 	for _, slot := range slots {
 		item := slot.TimetableItem
 		value := apimodel.CompleteTimetableItem{Type: item.Type, Date: item.Date, Period: item.Period, StartTime: item.StartTime, EndTime: item.EndTime, Subject: user.DBI.Subjects[item.SubjectID], GroupNames: item.GroupNames, IGroupID: item.IGroupID, StudentIDs: item.StudentIDs, Colors: item.Colors, BlockStart: slot.BlockStart, BlockEnd: slot.BlockEnd, OriginPeriod: slot.OriginPeriod, Classes: []model.Class{}, Teachers: []model.Teacher{}, Classrooms: []model.Classroom{}}
+		value.Changes = completeLessonChanges(slot.Changes, user)
+		if item.Type == "event" && value.Subject.Name == "" {
+			value.Subject.Name = item.Name
+			value.Subject.Short = item.Name
+		}
+		if value.StudentIDs == nil {
+			value.StudentIDs = []string{}
+		}
 		if value.GroupNames == nil {
 			value.GroupNames = []string{}
 		}
@@ -45,6 +56,32 @@ func completeSchoolSlots(slots []schoolday.Slot, user model.User) []apimodel.Com
 		}
 		result = append(result, value)
 	}
+	return result
+}
+
+func completeLessonChanges(changes schoolday.Changes, user model.User) apimodel.LessonChanges {
+	result := apimodel.LessonChanges{Changed: changes.Changed, Cancelled: changes.Cancelled, Teacher: changes.Teacher, Room: changes.Room, Class: changes.Class, Subject: changes.Subject, OriginalSubject: user.DBI.Subjects[changes.OriginalSubject].Name}
+	teachers, rooms, classes := []string{}, []string{}, []string{}
+	for _, id := range changes.OriginalTeachers {
+		teacher := user.DBI.Teachers[id]
+		name := strings.TrimSpace(teacher.Firstname + " " + teacher.Lastname)
+		if name != "" {
+			teachers = append(teachers, name)
+		}
+	}
+	for _, id := range changes.OriginalRooms {
+		if room := user.DBI.Classrooms[id].Name; room != "" {
+			rooms = append(rooms, room)
+		}
+	}
+	for _, id := range changes.OriginalClasses {
+		if class := user.DBI.Classes[id].Name; class != "" {
+			classes = append(classes, class)
+		}
+	}
+	result.OriginalTeacher = strings.Join(teachers, ", ")
+	result.OriginalRoom = strings.Join(rooms, ", ")
+	result.OriginalClass = strings.Join(classes, ", ")
 	return result
 }
 func SchoolDayHandler(c *gin.Context) {
@@ -90,13 +127,42 @@ func SchoolDayHandler(c *gin.Context) {
 	cached, ok := schoolDayCache.Entries[key]
 	schoolDayCache.Unlock()
 	var timetable model.Timetable
+	plans := map[string][]map[string]interface{}{}
 	if ok && time.Since(cached.Cached) < time.Minute {
 		timetable = cached.Timetable
+		plans = cached.Plans
 	} else {
 		timetable, err = client.GetTimetable(date, date.AddDate(0, 0, schoolday.LookAheadDays))
 		if err != nil {
 			c.JSON(502, gin.H{"error": "school_day_unavailable"})
 			return
+		}
+		enrichmentCtx, stopEnrichment := context.WithTimeout(c.Request.Context(), 12*time.Second)
+		defer stopEnrichment()
+		for day, items := range timetable.Days {
+			if enrichmentCtx.Err() != nil {
+				break
+			}
+			needsPlan := false
+			for _, item := range items {
+				if item.Changed || item.IsCancelled() {
+					needsPlan = true
+					break
+				}
+			}
+			if !needsPlan {
+				continue
+			}
+			dayDate, e := time.ParseInLocation("2006-01-02", day, location)
+			if e != nil {
+				continue
+			}
+			ctx, cancel := context.WithTimeout(enrichmentCtx, 4*time.Second)
+			plan, e := client.LessonPlan(ctx, dayDate)
+			cancel()
+			if e == nil {
+				plans[day] = plan
+			}
 		}
 		schoolDayCache.Lock()
 		if len(schoolDayCache.Entries) > 500 {
@@ -107,7 +173,7 @@ func SchoolDayHandler(c *gin.Context) {
 			}
 		}
 		if len(schoolDayCache.Entries) < 500 || ok {
-			schoolDayCache.Entries[key] = schoolDayCacheEntry{timetable, time.Now()}
+			schoolDayCache.Entries[key] = schoolDayCacheEntry{Timetable: timetable, Plans: plans, Cached: time.Now()}
 		}
 		schoolDayCache.Unlock()
 	}
@@ -115,21 +181,22 @@ func SchoolDayHandler(c *gin.Context) {
 	for _, p := range user.DBI.Periods {
 		periods = append(periods, p)
 	}
-	slots := schoolday.Split(timetable.Days[dateString], periods)
-	state := schoolday.Evaluate(date, now, slots)
+	slots := schoolday.Enrich(schoolday.Split(timetable.Days[dateString], periods), plans[dateString])
+	breaks := schoolday.Gaps(slots, periods)
+	state := schoolday.Evaluate(date, now, slots, breaks)
 	all := map[string][]apimodel.CompleteTimetableItem{}
 	days := map[string][]schoolday.Slot{}
 	for offset := 0; offset <= schoolday.LookAheadDays; offset++ {
 		day := date.AddDate(0, 0, offset)
 		dayKey := day.Format("2006-01-02")
-		daySlots := schoolday.Split(timetable.Days[dayKey], periods)
+		daySlots := schoolday.Enrich(schoolday.Split(timetable.Days[dayKey], periods), plans[dayKey])
 		days[dayKey] = daySlots
 		all[dayKey] = completeSchoolSlots(daySlots, user)
 	}
 	nextDate := schoolday.NextDate(dateString, days)
 	var next interface{}
 	if nextDate != "" {
-		nextSlots := days[nextDate]
+		nextSlots := schoolday.Active(days[nextDate])
 		next = gin.H{"date": nextDate, "school_start": nextSlots[0].StartTime, "school_end": nextSlots[len(nextSlots)-1].EndTime, "total_lessons": len(nextSlots), "lessons": all[nextDate]}
 	}
 	displayDate := dateString
@@ -139,5 +206,5 @@ func SchoolDayHandler(c *gin.Context) {
 		}
 	}
 	_, offset := now.Zone()
-	c.JSON(http.StatusOK, gin.H{"date": dateString, "display_date": displayDate, "server_time": now.Format(time.RFC3339Nano), "time_zone": zone, "utc_offset_seconds": offset, "state": state, "lessons": completeSchoolSlots(slots, user), "breaks": schoolday.Gaps(slots, periods), "next_school_day": next, "days": all, "periods": user.DBI.Periods, "checked_until": date.AddDate(0, 0, schoolday.LookAheadDays).Format("2006-01-02")})
+	c.JSON(http.StatusOK, gin.H{"date": dateString, "display_date": displayDate, "server_time": now.Format(time.RFC3339Nano), "time_zone": zone, "utc_offset_seconds": offset, "state": state, "lessons": completeSchoolSlots(slots, user), "breaks": breaks, "scheduled_breaks": schoolday.DefaultBreaks(), "next_school_day": next, "days": all, "periods": user.DBI.Periods, "checked_until": date.AddDate(0, 0, schoolday.LookAheadDays).Format("2006-01-02")})
 }

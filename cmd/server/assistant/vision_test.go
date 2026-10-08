@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 )
 
 func TestAttachmentVisionUsesOneImagePerRequest(t *testing.T) {
-	streamCalls := 0
-	visionCalls := 0
+	var streamCalls, visionCalls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload struct {
 			Stream   bool      `json:"stream"`
@@ -29,7 +29,7 @@ func TestAttachmentVisionUsesOneImagePerRequest(t *testing.T) {
 			}
 		}
 		if !payload.Stream {
-			visionCalls++
+			visionCalls.Add(1)
 			if images != 1 {
 				t.Fatalf("vision received %d images", images)
 			}
@@ -39,8 +39,7 @@ func TestAttachmentVisionUsesOneImagePerRequest(t *testing.T) {
 		if images != 0 {
 			t.Fatal("streaming tool completion received images")
 		}
-		streamCalls++
-		if streamCalls == 1 {
+		if streamCalls.Add(1) == 1 {
 			fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"f\",\"type\":\"function\",\"function\":{\"name\":\"read_attachment\",\"arguments\":\"{\\\"src\\\":\\\"/cloud/file.pdf\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}]}\n\ndata: [DONE]\n\n")
 		} else {
 			fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"Explanation\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n")
@@ -54,7 +53,7 @@ func TestAttachmentVisionUsesOneImagePerRequest(t *testing.T) {
 		return ToolResult{Data: map[string]string{}}, nil
 	})
 	err := service.Stream(context.Background(), Request{Message: "Read it", Language: "uk", Date: "2026-10-07"}, func(string, interface{}) error { return nil })
-	if err != nil || visionCalls != 2 || streamCalls != 2 {
+	if err != nil || visionCalls.Load() != 2 || streamCalls.Load() != 2 {
 		t.Fatalf("vision flow failed: %v", err)
 	}
 }

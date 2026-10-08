@@ -87,11 +87,11 @@ func TestSchoolClockBoundaries(t *testing.T) {
 		})
 	}
 }
-func TestFreePeriodAndFallback(t *testing.T) {
+func TestLunchBreakAndFallback(t *testing.T) {
 	slots := Split([]model.TimetableItem{lesson("5", "11:30", "13:00"), lesson("8", "14:00", "15:30")}, bells())
 	gaps := Gaps(slots, bells())
-	if len(slots) != 4 || len(gaps) != 1 || gaps[0].Kind != "free_period" || gaps[0].Seconds != 3600 {
-		t.Fatalf("free period was counted as a lesson: %+v", gaps)
+	if len(slots) != 4 || len(gaps) != 1 || gaps[0].Kind != "break" || gaps[0].Seconds != 3600 {
+		t.Fatalf("13:00–14:00 should be the school break: %+v", gaps)
 	}
 	fallback := Split([]model.TimetableItem{lesson("3", "09:45", "11:15")}, nil)
 	if len(fallback) != 2 || fallback[1].Period != "4" || fallback[1].StartTime != "10:30" {

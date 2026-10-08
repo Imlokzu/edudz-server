@@ -11,6 +11,10 @@ type Timetable struct {
 }
 
 type TimetableItem struct {
+	Changed      bool        `json:"changed,omitempty"`
+	Removed      bool        `json:"removed,omitempty"`
+	Cancelled    bool        `json:"cancelled,omitempty"`
+	Name         string      `json:"name,omitempty"`
 	Type         string      `json:"type"`
 	Date         string      `json:"date"`
 	Period       string      `json:"uniperiod"`
@@ -25,6 +29,10 @@ type TimetableItem struct {
 	StudentIDs   []string    `json:"studentids"`
 	Colors       []string    `json:"colors"`
 	Duration     json.Number `json:"durationperiods"`
+}
+
+func (item TimetableItem) IsCancelled() bool {
+	return item.Removed || item.Cancelled || item.Type == "absent"
 }
 
 func (t *Timetable) Merge(src *Timetable) {

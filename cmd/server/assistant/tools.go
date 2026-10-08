@@ -113,7 +113,7 @@ func SchoolTools(client *edupage.EdupageClient) ToolRunner {
 		}
 		switch name {
 		case "school_overview":
-			return overview(client, stringArg(args, "date"))
+			return overview(ctx, client, stringArg(args, "date"))
 		case "homework_details":
 			return homework(client, stringArg(args, "id"))
 		case "lesson_plan":
@@ -130,7 +130,7 @@ func SchoolTools(client *edupage.EdupageClient) ToolRunner {
 		}
 	}
 }
-func overview(client *edupage.EdupageClient, dateString string) (ToolResult, error) {
+func overview(ctx context.Context, client *edupage.EdupageClient, dateString string) (ToolResult, error) {
 	date, err := time.Parse("2006-01-02", dateString)
 	if err != nil {
 		return ToolResult{}, err
@@ -172,6 +172,17 @@ func overview(client *edupage.EdupageClient, dateString string) (ToolResult, err
 		for day, items := range tt.Days {
 			rows := []map[string]interface{}{}
 			slots := schoolday.Split(items, periods)
+			for _, item := range items {
+				if !item.Changed && !item.IsCancelled() {
+					continue
+				}
+				dayDate, _ := time.Parse("2006-01-02", day)
+				plan, e := client.LessonPlan(ctx, dayDate)
+				if e == nil {
+					slots = schoolday.Enrich(slots, plan)
+				}
+				break
+			}
 			for _, item := range slots {
 				rooms := []string{}
 				teachers := []string{}
@@ -182,7 +193,19 @@ func overview(client *edupage.EdupageClient, dateString string) (ToolResult, err
 					teacher := user.DBI.Teachers[id]
 					teachers = append(teachers, teacher.Firstname+" "+teacher.Lastname)
 				}
-				rows = append(rows, map[string]interface{}{"subject": user.DBI.Subjects[item.SubjectID].Name, "subject_id": item.SubjectID, "period": item.Period, "start": item.StartTime, "end": item.EndTime, "rooms": rooms, "teachers": teachers, "block_start": item.BlockStart, "block_end": item.BlockEnd, "origin_period": item.OriginPeriod})
+				subject := user.DBI.Subjects[item.SubjectID].Name
+				if subject == "" && item.Type == "event" {
+					subject = item.Name
+				}
+				originalTeachers, originalRooms := []string{}, []string{}
+				for _, id := range item.Changes.OriginalTeachers {
+					teacher := user.DBI.Teachers[id]
+					originalTeachers = append(originalTeachers, strings.TrimSpace(teacher.Firstname+" "+teacher.Lastname))
+				}
+				for _, id := range item.Changes.OriginalRooms {
+					originalRooms = append(originalRooms, user.DBI.Classrooms[id].Name)
+				}
+				rows = append(rows, map[string]interface{}{"subject": subject, "subject_id": item.SubjectID, "period": item.Period, "start": item.StartTime, "end": item.EndTime, "rooms": rooms, "teachers": teachers, "block_start": item.BlockStart, "block_end": item.BlockEnd, "origin_period": item.OriginPeriod, "cancelled": item.Changes.Cancelled, "changed": item.Changes.Changed, "teacher_changed": item.Changes.Teacher, "room_changed": item.Changes.Room, "class_changed": item.Changes.Class, "original_teachers": originalTeachers, "original_rooms": originalRooms})
 			}
 			lessons[day] = rows
 			breaks[day] = schoolday.Gaps(slots, periods)

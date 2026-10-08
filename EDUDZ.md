@@ -10,6 +10,8 @@ Authenticated extensions:
   school day. Includes 60 days ahead for weekends and holidays. Timetables are
   cached per account for one minute; clock state is evaluated on each request.
   `date=YYYY-MM-DD` and read-only `at=RFC3339` support schedule previews.
+  `scheduled_breaks` exposes this school's 09:30–09:45, 11:15–11:30 and
+  13:00–14:00 breaks. Free time is split around those breaks.
 - `GET /api/lesson-plan?date=YYYY-MM-DD`: the student's published lesson topics.
 - `GET /api/etest?testid=…&superid=…`: homework material cards.
 - `GET /api/file?src=…`: downloads the student's EduPage attachments using the session.
@@ -108,3 +110,22 @@ to the lesson count. The assistant's timetable uses the same splitting function.
 Boundary tests cover 08:44:59 → 08:45, both school breaks and 13:00 completion.
 Authenticated staging checks confirmed six lessons on 2026-10-07, Friday → Monday,
 and the autumn holiday jump from 2026-10-30 to 2026-11-09.
+
+## Published lesson changes — 2.3
+
+`lesson_changes` keeps school-published cancellation and change flags. For days
+with changes, the authenticated day plan supplies `flags.dp0.orig` and `changes`:
+the client can show a substitute, original/current room, class and subject.
+Exact period times and class/subject identity are matched; ambiguous or unavailable
+details retain a generic change marker. Original values are never inferred from
+another week's timetable. Metadata lookups have a 12-second total request budget.
+
+Cancelled periods remain visible but are excluded from current/remaining lessons,
+school start/end and next-school-day selection. Named replacement school events
+keep the actual attendance time. Assistant tool data uses the same rules.
+
+Live authenticated checks covered a published teacher and room change on
+2026-09-17, five removed periods replaced by a school event on 2026-09-18, and
+the 13:00–14:00 break with afternoon lessons on 2026-10-12.
+
+Protocol reference: [EdupageAPI's authenticated day-plan implementation](https://github.com/EdupageAPI/edupage-api/blob/master/edupage_api/timetables.py).

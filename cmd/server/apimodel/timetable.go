@@ -12,6 +12,7 @@ type CompleteTimetable struct {
 }
 
 type CompleteTimetableItem struct {
+	Changes      LessonChanges     `json:"lesson_changes"`
 	BlockStart   string            `json:"block_starttime,omitempty"`
 	BlockEnd     string            `json:"block_endtime,omitempty"`
 	OriginPeriod string            `json:"origin_period,omitempty"`
@@ -28,4 +29,17 @@ type CompleteTimetableItem struct {
 	Classrooms   []model.Classroom `json:"classrooms"`
 	StudentIDs   []string          `json:"studentids"`
 	Colors       []string          `json:"colors"`
+}
+
+type LessonChanges struct {
+	Changed         bool   `json:"changed"`
+	Cancelled       bool   `json:"cancelled"`
+	Teacher         bool   `json:"teacher_changed"`
+	Room            bool   `json:"room_changed"`
+	Class           bool   `json:"class_changed"`
+	Subject         bool   `json:"subject_changed"`
+	OriginalTeacher string `json:"original_teacher,omitempty"`
+	OriginalRoom    string `json:"original_room,omitempty"`
+	OriginalClass   string `json:"original_class,omitempty"`
+	OriginalSubject string `json:"original_subject,omitempty"`
 }
