@@ -203,7 +203,11 @@ func TimelineItemHandler(c *gin.Context) {
 		}
 	}
 
-	timelineItem := timeline.Items[id]
+	timelineItem, found := timeline.Items[id]
+	if !found || timelineItem.Removed.String() == "1" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "message_unavailable"})
+		return
+	}
 
 	var replies []apimodel.TimelineItemWithOrigin
 	for _, msg := range timeline.Items {
